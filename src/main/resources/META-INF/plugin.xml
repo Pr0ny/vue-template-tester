@@ -4,6 +4,10 @@
     <name>vue-template-tester</name>
     <vendor>pr0ny</vendor>
 
+    <description>
+        Plugin to generate .spec.js files for Vue components based on data-test attributes.
+    </description>
+
     <depends>com.intellij.modules.platform</depends>
 
     <resource-bundle>messages.MyBundle</resource-bundle>
@@ -12,4 +16,13 @@
         <toolWindow factoryClass="com.github.pr0ny.vuetemplatetester.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
         <postStartupActivity implementation="com.github.pr0ny.vuetemplatetester.startup.MyProjectActivity" />
     </extensions>
+
+    <actions>
+        <action id="GenerateVueTestAction"
+                class="com.github.pr0ny.vuetemplatetester.actions.GenerateVueTestAction"
+                text="Generate Vue Test Spec"
+                description="Generates a .spec.js file based on data-test attributes">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>
