@@ -13,7 +13,7 @@
     <resource-bundle>messages.MyBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="com.github.pr0ny.vuetemplatetester.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
+        <toolWindow factoryClass="com.github.pr0ny.vuetemplatetester.toolWindow.MyToolWindowFactory" id="Vue template tester"/>
         <postStartupActivity implementation="com.github.pr0ny.vuetemplatetester.startup.MyProjectActivity" />
     </extensions>
 

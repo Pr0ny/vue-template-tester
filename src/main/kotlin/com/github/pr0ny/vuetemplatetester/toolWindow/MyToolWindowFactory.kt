@@ -12,6 +12,8 @@ import com.github.pr0ny.vuetemplatetester.MyBundle
 import com.github.pr0ny.vuetemplatetester.services.MyProjectService
 import javax.swing.JButton
 
+import com.github.pr0ny.vuetemplatetester.services.EditorMemoryService
+
 
 class MyToolWindowFactory : ToolWindowFactory {
 
@@ -20,8 +22,22 @@ class MyToolWindowFactory : ToolWindowFactory {
     }
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val myToolWindow = MyToolWindow(toolWindow)
-        val content = ContentFactory.getInstance().createContent(myToolWindow.getContent(), null, false)
+        val memoryService = project.service<EditorMemoryService>()
+        val initialContent = memoryService.loadContent()
+
+        val panel = TextMemoryEditorPanel(
+            project,
+            initialImports = initialContent.imports,
+            initialDataTest = initialContent.dataTest,
+            initialSelector = initialContent.selector,
+            initialConditional = initialContent.localPath,
+            onSave = { content ->
+                memoryService.saveContent(content)
+            },
+            onCancel = {
+            }
+        )
+        val content = ContentFactory.getInstance().createContent(panel, "Settings", false)
         toolWindow.contentManager.addContent(content)
     }
 
