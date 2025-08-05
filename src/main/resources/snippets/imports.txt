@@ -1,0 +1,5 @@
+import { shallowMount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
+$attr
+import { beforeEach, describe, it, expect, vi } from 'vitest'
+import type { VueWrapper } from '@vue/test-utils'

@@ -1,6 +1,7 @@
 package com.github.pr0ny.vuetemplatetester.actions
 
 import com.github.pr0ny.vuetemplatetester.services.EditorMemoryService
+import com.github.pr0ny.vuetemplatetester.utils.FileReaderUtil
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
@@ -15,6 +16,7 @@ import com.intellij.psi.PsiFileFactory
 import com.intellij.psi.PsiManager
 import com.intellij.psi.codeStyle.CodeStyleManager
 import java.io.File
+import java.io.IOException
 
 class GenerateVueTestAction : AnAction() {
     override fun actionPerformed(event: AnActionEvent) {
@@ -61,29 +63,47 @@ class GenerateVueTestAction : AnAction() {
         Messages.showInfoMessage("Test file generated: ${specFile.name}", "Success")
     }
 
-
     private fun getUserImports(project: Project): String {
         return project.service<EditorMemoryService>().loadContent().imports
     }
 
-    private fun getUserDataTest(project: Project): String {
-        return project.service<EditorMemoryService>().loadContent().dataTest
+    private fun geLocalPath(project: Project): Boolean {
+        return project.service<EditorMemoryService>().loadContent().localPath
     }
 
     private fun getUserSelector(project: Project): String {
         return project.service<EditorMemoryService>().loadContent().selector
     }
 
-    private fun getImports(project: Project, componentName: String): String {
+    private fun getImports(project: Project, componentName: String, virtualFile: VirtualFile): String {
         val userImports = getUserImports(project)
-        val defaultImports = """
-            import { shallowMount } from '@vue/test-utils'
-            import { flushPromises, mount } from '@vue/test-utils'
-            import ${componentName} from './${componentName}.vue'
-            import { beforeEach, describe, it, expect, vi } from 'vitest'
-            import type { VueWrapper } from '@vue/test-utils'
-        """.trimIndent()
-        return  "${defaultImports}\n${userImports}\n\n"
+        val localPath = geLocalPath(project)
+        val componentPath = virtualFile.path
+        var componantImport = """import $componentName from './${componentName}.vue'"""
+
+        if (localPath == false) {
+            val srcIndex = componentPath.indexOf("/src/")
+
+            if (srcIndex != -1) {
+                val relativePath = componentPath.substring(srcIndex + 5) // +5 pour ignorer "/src/"
+                componantImport = """import $componentName from '@/${relativePath}'"""
+            } else {
+                Messages.showErrorDialog("An error occurred. Using local path to import the component.", "Error")
+            }
+        }
+
+        try {
+            val snippetPath = "snippets/imports.txt"
+            val snippetContent = FileReaderUtil.readFileFromResources(snippetPath)
+            val textWithReplacedAttr = snippetContent.replace("\$attr", componantImport)
+
+            return "${textWithReplacedAttr}\n${userImports}\n\n"
+        } catch (e: Exception) {
+                e.printStackTrace()
+                Messages.showErrorDialog("Failed to read the snippet file: ${e.localizedMessage}", "Error")
+        }
+
+        return  "${userImports}\n\n"
     }
 
     private fun getWrapperCreator(componentName: String): String {
@@ -94,20 +114,29 @@ class GenerateVueTestAction : AnAction() {
             }
         })
             
-        vi.mock('@/folder/Name', () => {
+        vi.mock('@/folder/Name', async () => {
             const actual = await vi.importActual('@/folder/file')
             return {
                 ...actual,
                 name: {
-                    functionName: () => Promise.resolve(),
+                    functionName: async () => Promise.resolve(),
                 },
             }
         })
             
         const mocks = {}
         
-        const createWrapper = (): VueWrapper => {
+        const props: MyPropsType = {}
+        
+        // Replace props type MyPropsType here and above to fit with real model
+        const createWrapper = (testprops: Partial<MyPropsType> = {}): VueWrapper => {
+            const finalProps = {
+                ...props,
+                ...testprops,
+            }
+
             return shallowMount(${componentName}, {
+                props: finalProps,
                 global: {
                     plugins: [],
                     mocks,
@@ -120,27 +149,35 @@ class GenerateVueTestAction : AnAction() {
         """.trimIndent()
     }
 
+    private fun addQuote(str: String): String {
+        return "'" + str + "'"
+    }
+
     private fun getSelector(project: Project, attr: String): String {
-        val selector = """[data-test="$attr"]"""
+        val selector = """'[data-test="$attr"]'"""
         val userSelector = getUserSelector(project)
 
         if (userSelector === "") {
             return selector
         }
 
-        return userSelector.replace("\$attr", attr)
+        return userSelector.replace("\$attr", addQuote(attr))
     }
 
     private fun getCheck(dataTest: String, name: String): String {
         return """
-            it('should render $name attributes', () => {
-            expect(wrapper.find('$dataTest').exists()).to.be.true
+            it('should render $name attribute', () => {
+            const element = wrapper.find($dataTest)
+            
+            expect(element.exists()).to.be.true
         })
+        
         """.trimIndent()
     }
 
     private fun getDescribe(componentName: String, checks: String): String {
         return """describe('Should display ${componentName}', () => {
+            
             beforeEach(() => {
                 wrapper = createWrapper()
             })
@@ -153,7 +190,7 @@ class GenerateVueTestAction : AnAction() {
     private fun generateTestFile(componentName: String, dataTestAttributes: List<String>, project: Project, virtualFile: VirtualFile): String {
         val componentName = virtualFile.nameWithoutExtension
         val componentNameWithCapitalLetter = componentName.substring(0, 1).uppercase() + componentName.substring(1)
-        val imports = getImports(project, componentName)
+        val imports = getImports(project, componentName, virtualFile)
         val wrapper = getWrapperCreator(componentNameWithCapitalLetter)
 
         val checks = dataTestAttributes.joinToString("\n") { attr ->
